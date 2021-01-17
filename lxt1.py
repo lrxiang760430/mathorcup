@@ -1,6 +1,8 @@
-from numpy.lib.function_base import append
-import pandas as pd 
+#from numpy.lib.function_base import append
+import pandas as pd
+from pandas import DataFrame,Series 
 import matplotlib.pyplot as plt
+import numpy as np
 import json
 import demjson
 import warnings
@@ -139,3 +141,89 @@ print(full['crew'])
 for j in json_column[0:4]:
     full[j]=full[j].apply(get_name)
 print(full['crew'])
+
+
+#重命名
+rename_dict={'cast':'actor','crew':'director'}
+full.rename(columns=rename_dict,inplace=True)
+full.info()
+print(full.head(5))
+
+#备份原始数据框original_full
+org_full=full.copy()
+full.reset_index().to_csv("TMDB_5000_Movie_Dataset_Cleaned.csv")
+#定义一个集合，获取所有的电影类型
+genre=set()
+for i in full['genres'].str.split(','): 
+    #去掉字符串之间的分隔符，得到单个电影类型
+    genre=set().union(i,genre) 
+    #集合求并集
+
+print(genre)
+#去掉多余的单引号
+genre.discard('')
+print(genre)
+
+#将genre转变成列表
+genre_list=list(genre)
+
+#创建数据框-电影类型
+
+genre_df=pd.DataFrame()
+
+#对电影类型进行one-hot编程
+for i in genre_list:
+    #如果包含类型i，则编码为1，否则编码为0
+    genre_df[i]=full['genres'].str.contains(i).apply(lambda x:1 if x else 0)
+
+#把数据框的索引变为年份
+genre_df.index=full['release_date']
+print(genre_df.head(5))
+full.info()
+
+#计算得到每种类型的电影总数目，并降序排列
+grnre_sum=genre_df.sum().sort_values(ascending=False)
+#可视化
+plt.rcParams['font.sans-serif']=['SimHei']
+#用来显示中文
+grnre_sum.plot(kind='bar',label='genres',figsize=(12,9))
+plt.title('不同类型的电影数量总计',fontsize=20)
+plt.xticks(rotation=60)
+plt.xlabel('电影类型',fontsize=16)
+plt.ylabel('数量',fontsize=16)
+plt.grid(False)
+plt.savefig("不同电影类型数量-条形图.png",dpi=300)
+plt.show()
+
+#电影类型饼图
+gen_shares=grnre_sum/grnre_sum.sum()
+
+#设置other类，当电影类型所占比例小于1%时，全部归到other类中
+others=0.01
+gen_pie=gen_shares[gen_shares>=others]
+gen_pie['others']=gen_shares[gen_shares<others].sum()
+
+#设置分裂属性
+#所占比例小于或等于2%时，增大每块饼片边缘偏离半径的百分比
+explode=(gen_pie<=0.02)/10
+
+#绘制饼图
+gen_pie.plot(kind='pie',label='',explode=explode,startangle=0,shadow=False,autopct='%3.1f%%',figsize=(8,8))
+plt.title('不同电影类型所占百比分',fontsize=20)
+plt.savefig("不同电影类型所占百分比-饼图.png",dpi=300)
+plt.show()
+
+#电影类型变化趋势（折线图）
+#电影类型随时间变化的趋势
+gen_year_sum=genre_df.sort_index(ascending=False).groupby('release_date').sum()
+gen_year_sum_sub=gen_year_sum[['Drama','Comedy','Thriller','Action','Adventure','Crime','Romance','Science Fiction']]
+gen_year_sum_sub.plot(figsize=(12,9))
+plt.legend(gen_year_sum_sub.columns)
+plt.xticks(range(1915,2018,10))
+plt.xlabel('年份',fontsize=16)
+plt.ylabel('数量',fontsize=16)
+plt.title('不同电影变化趋势',fontsize=20)
+
+plt.grid(False)
+plt.savefig("不同电影类型数量-折线图2.png",dpi=600)
+plt.show()
